@@ -30,11 +30,11 @@ use micromath::F32Ext;
 use panic_halt; // When a panic occurs, stop the microcontroller
 
 
+
 // This marks the entrypoint of our application. The cortex_m_rt creates some
 // startup code before this, but we don't need to worry about this
 #[entry]
 fn main() -> ! {
-
 
     // Get handles to the hardware objects. These functions can only be called
     // once, so that the borrowchecker can ensure you don't reconfigure
@@ -114,6 +114,33 @@ fn main() -> ! {
         &mut rcc.apb2,
     );
 
+    let mut nprint = |x: u32| {
+        let mut xb: u32 = x;
+
+        let mut c = 0;
+        let mut buf: [u32; 10] = [0; 10];
+        loop {
+            let m = xb % 10;
+            buf[c] = m;
+            xb = xb / 10;
+            if xb == 0 {
+                break;
+            }
+            c = c + 1;        
+        };
+        let mut n_init = false;
+        for x in buf.iter().rev() {
+            if x != &0u32 {
+                n_init = true;
+            }
+            if n_init {
+                block!(serial.write(0x30 + (*x as u8))).ok();
+            }
+        }
+        block!(serial.write(0x0A)).ok();
+    };
+
+
 
 
     // Display
@@ -181,19 +208,9 @@ fn main() -> ! {
                 }
                 a
             });
-
-        // let mut bla = 135 as u8;
-        // loop {
-        //     let m = bla / 10;
-        //     let bla = bla / 10;
-
-        //     let sent = 0x31 + bla;
-        //     block!(serial.write(sent)).ok();
-        //     if bla == 0 {
-        //         break;
-        //     }
-        // }
         
+
+        //nprint(ampl_max as u32);
 
         for i in 0..64 {
             if i < 5 {
