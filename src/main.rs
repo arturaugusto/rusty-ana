@@ -178,6 +178,8 @@ fn main() -> ! {
 
 
     let mut samples: [f32; 256] = [0.0; 256];
+    let mut samplesb: [f32; 256] = [0.0; 256];
+
     let mut amplitudes: [u32; 128] = [0; 128];
 
     let mut window: [f32; 256] = [0.0; 256];
@@ -196,8 +198,9 @@ fn main() -> ! {
         }
 
         for i in 0..256 {
-            delay.delay_us(128u16);
+            delay.delay_us(256u16);
             let mut data: u16 = adc1.read(&mut ch0).unwrap();
+
             //samples[i as usize] = (data/30 - 20) as f32;
             
             samples[i as usize] = (data as f32) * window[i];
@@ -223,7 +226,7 @@ fn main() -> ! {
         //nprint(ampl_max as u32);
 
         for i in 0..128 {
-            if i <= 0 {
+            if i <= 10 {
                 continue;
             }
             let ampl_n = spectrum[i as usize].norm_sqr() as f32;
