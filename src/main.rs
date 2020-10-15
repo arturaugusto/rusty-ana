@@ -17,7 +17,6 @@ use stm32f1xx_hal::{
     delay::Delay, pac, adc, prelude::*,
     spi::{Mode, Phase, Polarity, Spi},
     serial::{Config, Serial},
-
 }; // STM32F1 specific functions
 
 use microfft;
@@ -178,8 +177,16 @@ fn main() -> ! {
 
 
 
-    let mut samples: [f32; 128] = [0.0; 128];
-    let mut amplitudes: [u32; 64] = [0; 64];
+    let mut samples: [f32; 256] = [0.0; 256];
+    let mut amplitudes: [u32; 128] = [0; 128];
+
+    let mut window: [f32; 256] = [0.0; 256];
+    
+    for i in 0..256 {
+        let sin1 = F32Ext::sin(3.142*(i as f32)/256.);
+        window[i] = sin1 * sin1;
+    }
+
 
     loop {
         for i in 0..64 {
@@ -188,21 +195,24 @@ fn main() -> ! {
             } 
         }
 
-        for i in 0..128 {
-            //delay.delay_us(62u16);
+        for i in 0..256 {
+            delay.delay_us(128u16);
             let mut data: u16 = adc1.read(&mut ch0).unwrap();
-            samples[i as usize] = (data/30 - 20) as f32;
-            if i > 64 {
-                disp.set_pixel(i, samples[i as usize] as u32, 1);
-            }
+            //samples[i as usize] = (data/30 - 20) as f32;
+            
+            samples[i as usize] = (data as f32) * window[i];
+            //samples[i as usize] = (data as f32);
+            // if i > 64 {
+            //     disp.set_pixel(i, samples[i as usize] as u32, 1);
+            // }
         }
 
-        let spectrum = microfft::real::rfft_128(&mut samples);
+        let spectrum = microfft::real::rfft_256(&mut samples);
         
         let ampl_max_n = 0;
         let ampl_max = spectrum[5..].iter()
             .map(|x| x.norm_sqr() as f32)
-            .fold(3000., |a, c| {            
+            .fold(0., |a, c| {            
                 if c > a {
                     return c;
                 }
@@ -212,8 +222,8 @@ fn main() -> ! {
 
         //nprint(ampl_max as u32);
 
-        for i in 0..64 {
-            if i < 5 {
+        for i in 0..128 {
+            if i <= 0 {
                 continue;
             }
             let ampl_n = spectrum[i as usize].norm_sqr() as f32;
