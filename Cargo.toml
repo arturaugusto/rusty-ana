@@ -27,7 +27,7 @@ micromath = "1.1.0"
 
 [dependencies.microfft]
 default-features = false
-features = ["maxn-256"]
+features = ["maxn-1024"]
 version = "0.3.0"
 
 # Access to the stm32f103 HAL.

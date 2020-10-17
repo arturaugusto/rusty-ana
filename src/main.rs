@@ -5,14 +5,14 @@
 #![no_main]
 
 use cortex_m_rt::entry; // The runtime
-use cortex_m_semihosting::hprintln;
+//use cortex_m_semihosting::hprintln;
 
 use nb::block;
 
 use ssd1306::{prelude::*, Builder};
 
 
-use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
+//use embedded_hal::digital::v2::OutputPin; // the `set_high/low`function
 use stm32f1xx_hal::{
     delay::Delay, pac, adc, prelude::*,
     spi::{Mode, Phase, Polarity, Spi},
@@ -55,7 +55,7 @@ fn main() -> ! {
     // handle to a single pin, we need to configure the pin first. Pin C13
     // is usually connected to the Bluepills onboard LED.
     
-    let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    let _led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
 
     // Now we need a delay object. The delay is of course depending on the clock
     // frequency of the microcontroller, so we need to fix the frequency
@@ -66,6 +66,13 @@ fn main() -> ! {
     // Now we can set the controllers frequency to 8 MHz:
     //let clocks = rcc.cfgr.freeze(&mut flash.acr);
     let clocks = rcc.cfgr.sysclk(8.mhz()).freeze(&mut flash.acr);
+    // let clocks = rcc
+    //     .cfgr
+    //     //.use_hse(8.mhz())
+    //     //.sysclk(56.mhz())
+    //     //.pclk1(28.mhz())
+    //     .adcclk(1.khz())
+    //     .freeze(&mut flash.acr);
 
     //hprintln!("adc freq: {}", clocks.adcclk().0).unwrap();
     // target halted due to debug-request, current mode: Thread 
@@ -113,7 +120,7 @@ fn main() -> ! {
         &mut rcc.apb2,
     );
 
-    let mut nprint = |x: u32| {
+    let mut _nprint = |x: u32| {
         let mut xb: u32 = x;
 
         let mut c = 0;
@@ -175,17 +182,17 @@ fn main() -> ! {
     disp.reset(&mut rst, &mut delay).unwrap();
     disp.init().unwrap();
 
+    const N: usize = 1024;
 
+    let mut samples: [f32; N] = [0.0; N];
+    let mut samplesb: [f32; N] = [0.0; N];
 
-    let mut samples: [f32; 256] = [0.0; 256];
-    let mut samplesb: [f32; 256] = [0.0; 256];
+    let _amplitudes: [u32; 128] = [0; 128];
 
-    let mut amplitudes: [u32; 128] = [0; 128];
-
-    let mut window: [f32; 256] = [0.0; 256];
+    let mut window: [f32; N] = [0.0; N];
     
-    for i in 0..256 {
-        let sin1 = F32Ext::sin(3.142*(i as f32)/256.);
+    for i in 0..N {
+        let sin1 = F32Ext::sin(3.142*(i as f32)/(N as f32));
         window[i] = sin1 * sin1;
     }
 
@@ -197,25 +204,27 @@ fn main() -> ! {
             } 
         }
 
-        for i in 0..256 {
+        for i in 0..N {
             delay.delay_us(256u16);
-            let mut data: u16 = adc1.read(&mut ch0).unwrap();
+            let data: u16 = adc1.read(&mut ch0).unwrap();
 
             //samples[i as usize] = (data/30 - 20) as f32;
             
             samples[i as usize] = (data as f32) * window[i];
-            //samples[i as usize] = (data as f32);
-            // if i > 64 {
-            //     disp.set_pixel(i, samples[i as usize] as u32, 1);
-            // }
         }
 
-        let spectrum = microfft::real::rfft_256(&mut samples);
+        for i in 0..N {
+            samples[i] = samples[i] * 0.8 + samplesb[i] * 0.2;
+            samplesb[i] = samples[i];
+        }
         
-        let ampl_max_n = 0;
-        let ampl_max = spectrum[5..].iter()
+        let spectrum = microfft::real::rfft_1024(&mut samples);
+
+        let fl = 60;
+        let fh = 128;
+        let ampl_max = spectrum[fl..fh].iter()
             .map(|x| x.norm_sqr() as f32)
-            .fold(0., |a, c| {            
+            .fold(0., |a, c| {
                 if c > a {
                     return c;
                 }
@@ -225,22 +234,16 @@ fn main() -> ! {
 
         //nprint(ampl_max as u32);
 
-        for i in 0..128 {
-            if i <= 10 {
-                continue;
-            }
+        for i in fl..fh {
             let ampl_n = spectrum[i as usize].norm_sqr() as f32;
-            //F32Ext::log10(ampl_n/ampl_max*64.)
             let ampl = (64.*(ampl_n/(ampl_max))) as u32;
+            //let ampl = 64 * F32Ext::log10(ampl_n/(ampl_max)) as u32;
             for j in 0..ampl {
                 if j < 64 {
-                    disp.set_pixel(i, 64-j, 1);
+                    disp.set_pixel(i as u32, 64-j, 1);
                 }
             }
         }
-
         disp.flush().unwrap();
-
-
     }
 }
